@@ -8,8 +8,6 @@ export default async function handler(req, res) {
 
     if (req.method === "POST") {
       const { temperature, humidity } = req.body;
-
-      // Validate data
       if (
         temperature === undefined ||
         humidity === undefined ||
@@ -35,7 +33,6 @@ export default async function handler(req, res) {
         .sort({ timestamp: -1 })
         .limit(10)
         .toArray();
-
       return res.status(200).json(data);
     } else {
       res.setHeader("Allow", ["POST", "GET"]);
