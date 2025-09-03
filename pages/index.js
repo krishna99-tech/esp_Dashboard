@@ -1,81 +1,79 @@
-import { useEffect, useState } from "react";
-import { Line } from "react-chartjs-2";
-import Papa from "papaparse";
+// pages/index.js
+import { useState, useEffect } from "react";
 
 export default function Dashboard() {
   const [data, setData] = useState([]);
-  
-  const fetchData = async () => {
-    const res = await fetch("/api/data");
-    const json = await res.json();
-    setData(json.reverse()); // show oldest first
-  };
+  const [latest, setLatest] = useState({ temperature: "--", humidity: "--", timestamp: null });
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const fetchData = async () => {
+      try {
+        const res = await fetch("/api/data");
+        const json = await res.json();
+        setData(json);
+        setLatest(json.length > 0 ? json[0] : { temperature: "--", humidity: "--", timestamp: null });
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setData([]);
+        setLatest({ temperature: "--", humidity: "--", timestamp: null });
+      }
+    };
+
+    fetchData(); // Initial fetch
+    const interval = setInterval(fetchData, 5000); // Refresh every 5s
     return () => clearInterval(interval);
   }, []);
-
-  // Prepare chart data
-  const chartData = {
-    labels: data.map(d => new Date(d.timestamp).toLocaleTimeString()),
-    datasets: [
-      {
-        label: "Temperature (°C)",
-        data: data.map(d => d.temperature),
-        borderColor: "red",
-        backgroundColor: "rgba(255,0,0,0.2)",
-        tension: 0.3,
-      },
-      {
-        label: "Humidity (%)",
-        data: data.map(d => d.humidity),
-        borderColor: "blue",
-        backgroundColor: "rgba(0,0,255,0.2)",
-        tension: 0.3,
-      },
-    ],
-  };
-
-  // CSV download
-  const downloadCSV = () => {
-    const csv = Papa.unparse(data);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "sensor_data.csv");
-    link.click();
-  };
 
   return (
     <div className="container">
       <h1>🌐 ESP32 Dashboard</h1>
-
+      
       <div className="cards">
-        <div className="card">
-          <h2>Latest Temperature</h2>
-          <p>{data[data.length - 1]?.temperature ?? "--"} °C</p>
+        <div className="card temp">
+          <h2>🌡 Temperature</h2>
+          <p>{latest.temperature} °C</p>
         </div>
-        <div className="card">
-          <h2>Latest Humidity</h2>
-          <p>{data[data.length - 1]?.humidity ?? "--"} %</p>
+        <div className="card hum">
+          <h2>💧 Humidity</h2>
+          <p>{latest.humidity} %</p>
         </div>
       </div>
 
-      <div className="chart">
-        <Line data={chartData} />
-      </div>
+      <p className="timestamp">
+        ⏱ Last Update: {latest.timestamp ? new Date(latest.timestamp).toLocaleTimeString() : "--"}
+      </p>
 
-      <button onClick={downloadCSV}>Download CSV</button>
+      <h3>Last 10 Records</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Temperature (°C)</th>
+            <th>Humidity (%)</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d, idx) => (
+            <tr key={idx}>
+              <td>{d.temperature}</td>
+              <td>{d.humidity}</td>
+              <td>{new Date(d.timestamp).toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <style jsx>{`
-        .container { font-family: Arial; padding: 2rem; text-align: center; }
-        .cards { display: flex; justify-content: center; gap: 2rem; margin-bottom: 2rem; }
-        .card { background: #fff; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; border-radius: 6px; }
-        .chart { max-width: 800px; margin: 0 auto 2rem auto; }
+        .container { text-align:center; padding:2rem; font-family: Arial, sans-serif; }
+        h1 { color:#333; }
+        .cards { display:flex; justify-content:center; gap:2rem; margin:1rem 0; flex-wrap:wrap; }
+        .card { padding:1.5rem; background:#fff; border-radius:12px; min-width:150px; box-shadow:0 4px 10px rgba(0,0,0,0.1); }
+        .temp { border-top:4px solid #ff6b6b; }
+        .hum { border-top:4px solid #4dabf7; }
+        table { margin:1rem auto; border-collapse:collapse; width:80%; }
+        th, td { border:1px solid #ccc; padding:0.5rem; }
+        th { background:#f0f0f0; }
+        .timestamp { margin:1rem 0; color:#777; }
       `}</style>
     </div>
   );
